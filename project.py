@@ -21,6 +21,10 @@ import seaborn as sns
 from collections import Counter
 import copy
 
+import time
+from utilsParallel import *
+from multiprocessing import Process, Manager
+
 #============================================================================= 
 #Splitting .pcap File in 5 different pcap file
 #=============================================================================
@@ -113,140 +117,223 @@ print()
 file_name = glob.glob("./Splitting/*.pcap")[0]
 print("Working with: ", file_name)
 pcap = pyshark.FileCapture(file_name)
-#Create file pickle
-# def extract_Info_pckt(file_name): #nome del file del pcap trace: #lista_packet_ICMP
-    
-#     pcap = pyshark.FileCapture(file_name) #reading pcap file
 
-#     title = ["Label DSCP", "header len", "ds_field","ds_field_ecn", "length", 
-#           "Protocol" ,"flag_df", "flag_mf", "flag_rb", "fragment_offset", "ttl", 
-#           "IP_SRC", "IP_DST","src_port", "dst_port","time"] 
-#     #header_len circa 20 bytes
-#     #ds_len info about diferentiated service,priority of a packet in the network
-#     #ecn: explicit congestion notification, will know if there is congestion in that link
-#     #all the features come from IP layer tranne per src and dst port
-#     #protocol = 6 se tcp, 17 udp
-#     #ttl: how many hop remain for that specific pkt until reach the destination, se 0 link molto congestionato 
-#     #time of capture that specific pkt
+
+#=============================================================================
+# Sequential read
+#=============================================================================
+
+'''
+#Create file pickle
+def extract_Info_pckt(file_name): #nome del file del pcap trace: #lista_packet_ICMP
+    
+     pcap = pyshark.FileCapture(file_name) #reading pcap file
+
+     title = ["Label DSCP", "header len", "ds_field","ds_field_ecn", "length", 
+           "Protocol" ,"flag_df", "flag_mf", "flag_rb", "fragment_offset", "ttl", 
+           "IP_SRC", "IP_DST","src_port", "dst_port","time"] 
+     #header_len circa 20 bytes
+     #ds_len info about diferentiated service,priority of a packet in the network
+     #ecn: explicit congestion notification, will know if there is congestion in that link
+     #all the features come from IP layer tranne per src and dst port
+     #protocol = 6 se tcp, 17 udp
+     #ttl: how many hop remain for that specific pkt until reach the destination, se 0 link molto congestionato 
+     #time of capture that specific pkt
     
     
     
-#     total_info = []  # for each pkt i fil this list, will be a list of list and then will transform in  a dataframe
-#     print("Now I'm working on: " + file_name)
-#     print()
+     total_info = []  # for each pkt i fil this list, will be a list of list and then will transform in  a dataframe
+     print("Now I'm working on: " + file_name)
+     print()
        
     
-#     i = 0
-#     dscp = []
-#     total_info.append(title) # total_info è la lista più esterna, values la lista per ogni pkt
+     i = 0
+     dscp = []
+     total_info.append(title) # total_info è la lista più esterna, values la lista per ogni pkt
     
-#     for packet in pcap:
+     for packet in pcap:
         
-#         ### MAC Address verification ###
-#         #sorgente = pcap[0].eth.src
+         ### MAC Address verification ###
+         #sorgente = pcap[0].eth.src
             
-#         #Creating an empty list where we collect info about the packet
-#         #Useful this format to create then a DataFrame
+         #Creating an empty list where we collect info about the packet
+         #Useful this format to create then a DataFrame
         
-#         values = []
+         values = []
         
-#         #print(packet.layers)
-#         #We extract onòy the packets from IP Level and only Version IPv4
-#         #if 'IP' in packet and packet.eth.src == sorgente:
-#         if 'IP' in packet : #we are just taking ip packet, exploit the dissectors available on tshark. 
-#             #dissector= a zoom on each specific layer of the packet          
+         #print(packet.layers)
+         #We extract onòy the packets from IP Level and only Version IPv4
+         #if 'IP' in packet and packet.eth.src == sorgente:
+         if 'IP' in packet : #we are just taking ip packet, exploit the dissectors available on tshark. 
+             #dissector= a zoom on each specific layer of the packet          
             
-#             #Label
-#             values.append(packet.ip.dsfield_dscp) #we extract form each pkt the specific info that we want to add in our list 
-#             dscp.append(packet.ip.dsfield_dscp)
-#             #Features
+             #Label
+             values.append(packet.ip.dsfield_dscp) #we extract form each pkt the specific info that we want to add in our list 
+             dscp.append(packet.ip.dsfield_dscp)
+             #Features
             
-#             #Header Length
-#             values.append(int(packet.ip.hdr_len))
-#             #Differentiated Service
-#             values.append(int(packet.ip.dsfield,16))
-#             #Explicit Congestion Notification
-#             values.append(packet.ip.dsfield_ecn)
-#             #Length of the Packet including the header
-#             values.append(int(packet.ip.len))
-#             #Number of Protocol (e.g. 6 = TCP, 17 = UDP, 1 = ICMP)
-#             values.append(int(packet.ip.proto))
-#             #Flag Do not Fragment 
-#             values.append(packet.ip.flags_df)
-#             #Flag More Fragment
-#             values.append(packet.ip.flags_mf)
-#             #Flag Reserved - Must be 0
-#             values.append(packet.ip.flags_rb)
-#             #Fragment Offset
-#             values.append(packet.ip.frag_offset)
-#             #Time To Live
-#             values.append(int(packet.ip.ttl))
+             #Header Length
+             values.append(int(packet.ip.hdr_len))
+             #Differentiated Service
+             values.append(int(packet.ip.dsfield,16))
+             #Explicit Congestion Notification
+             values.append(packet.ip.dsfield_ecn)
+             #Length of the Packet including the header
+             values.append(int(packet.ip.len))
+             #Number of Protocol (e.g. 6 = TCP, 17 = UDP, 1 = ICMP)
+             values.append(int(packet.ip.proto))
+             #Flag Do not Fragment 
+             values.append(packet.ip.flags_df)
+             #Flag More Fragment
+             values.append(packet.ip.flags_mf)
+             #Flag Reserved - Must be 0
+             values.append(packet.ip.flags_rb)
+             #Fragment Offset
+             values.append(packet.ip.frag_offset)
+             #Time To Live
+             values.append(int(packet.ip.ttl))
             
             
-#             #### Extraction of the Ip Source and Ip Destination###
+             #### Extraction of the Ip Source and Ip Destination###
             
-#             source = packet.ip.src
-#             values.append(source)
+             source = packet.ip.src
+             values.append(source)
             
-#             destination = packet.ip.dst
-#             values.append(destination)
+             destination = packet.ip.dst
+             values.append(destination)
   
-#             #### Extraction of the Port ####
-#             if "UDP" in packet:
-#                 values.append(packet.udp.srcport)
-#                 values.append(packet.udp.dstport)
+             #### Extraction of the Port ####
+             if "UDP" in packet:
+                 values.append(packet.udp.srcport)
+                 values.append(packet.udp.dstport)
 
-#             elif "TCP" in packet :
-#                 values.append(packet.tcp.srcport)
-#                 values.append(packet.tcp.dstport)            
+             elif "TCP" in packet :
+                 values.append(packet.tcp.srcport)
+                 values.append(packet.tcp.dstport)            
                 
-#             else:
-#                 #Protocol as IP and ICMP e Ws.Short Port in src and dst will be set to -1
-#                 values.append(-1) #dummy variable to recognize that pkt comes from different protocol
-#                 values.append(-1)
+             else:
+                 #Protocol as IP and ICMP e Ws.Short Port in src and dst will be set to -1
+                 values.append(-1) #dummy variable to recognize that pkt comes from different protocol
+                 values.append(-1)
                 
-#             #if "ICMP" in packet:
-#             #    lista_packet_ICMP.append((packet.ip.dsfield_dscp, packet.icmp.type, packet.icmp.code))
+             #if "ICMP" in packet:
+             #    lista_packet_ICMP.append((packet.ip.dsfield_dscp, packet.icmp.type, packet.icmp.code))
             
             
-#             #Time will be used for the simulation
-#             time = float(packet.sniff_timestamp)
-#             values.append(time)
+             #Time will be used for the simulation
+             time = float(packet.sniff_timestamp)
+             values.append(time)
              
-#             #Update the number of pckts
-#             i += 1
+             #Update the number of pckts
+             i += 1
             
-#             #Store all the caracteristics of a packet into the Totale list
-#             total_info.append(values)
+             #Store all the caracteristics of a packet into the Totale list
+             total_info.append(values)
             
-#     print("Now we have finished the analysis so we closed the file: " + file_name)     
-#     pcap.close()
+     print("Now we have finished the analysis so we closed the file: " + file_name)     
+     pcap.close()
    
-#     print(len(total_info))
-#     #Creation of the data frame
-#     dataFrame = pd.DataFrame(total_info[1:],columns = total_info[0])
+     print(len(total_info))
+     #Creation of the data frame
+     dataFrame = pd.DataFrame(total_info[1:],columns = total_info[0])
     
-#     return dataFrame
+     return dataFrame
     
-#     # #We are saving the dataframe of Features Packets
-#     # with open('FeaturesDataFrame/' + title + '.pkl', 'wb') as f:
-#     #     pickle.dump(tot_dat, f)
+     # #We are saving the dataframe of Features Packets
+     # with open('FeaturesDataFrame/' + title + '.pkl', 'wb') as f:
+     #     pickle.dump(tot_dat, f)
     
-#     # print("Here we have analyzed this number of pckts: " + str(i))
+     # print("Here we have analyzed this number of pckts: " + str(i))
     
-#     #Label Analysis
-#     # occ_label = dict(Counter(dscp))
-#     #print("DSCP occurrences",occ_label)
+     #Label Analysis
+     # occ_label = dict(Counter(dscp))
+     #print("DSCP occurrences",occ_label)
 
-  
-# dataFrame = extract_Info_pckt(file_name)
-# print("Finish the reading part")
-# dataFrame.to_pickle("PacketDataframe.pkl")
+start_time = time.time()
+dataFrame = extract_Info_pckt(file_name)
+print("Finish the sequential reading part")
+dataFrame.to_pickle("PacketDataframe.pkl")
+print("Sequential read took %s seconds " % (time.time() - start_time))
+
+sys.exit("error message")
+'''
+
+#=============================================================================
+# Parallel read
+#=============================================================================
+
+if __name__ == "__main__":
+    
+    #list_files = glob.glob("./*.pcap")
+    list_files = glob.glob("./Splitting/*.pcap")
+    
+    print("# Files \t", len(list_files))
+    pcap_analyzed = list_files[0]
+    
+    sub_dir = "SplitRead/"
+    
+    #Remove directory already created
+    #shutil.rmtree(sub_dir) 
+    
+    try:
+        os.mkdir("./" + sub_dir)
+    #If you have already created it Error
+    except OSError:
+        print("Creation of the directory %s failed" % sub_dir)
+    else:
+        print("Successfully created the directory %s" % sub_dir)
+    
+    cmd('editcap -c 1 ' + pcap_analyzed +" ./"+ sub_dir +"__mini.pcap")
+    #cmd("complete PATH for wireshark...")
+    
+    print("Current Working Directory: "+ os.getcwd())
+    
+    #Change directory
+    os.chdir("./"+sub_dir)
+    
+    print("New Working Directory: "+ os.getcwd())
+    
+    splitting_file = sorted(glob.glob("*.pcap"))
+    
+    print("# Splitted Files \t", len(list_files))
+    
+    manager = Manager()
+    
+    start_time = time.time()
+    
+    lista_process = []
+    
+    for i in range(len(splitting_file)):
+        print("ok_")
+        file = splitting_file[i]
+        
+        p1 = Process(target = extract_Info_pckt, args = (file,))
+        
+        lista_process.append(p1)
+        
+        p1.start()
+        
+    for process in lista_process:
+        process.join()
+        
+    ### Finish ####
+    
+    print("Finish the parallel reading part")
+    print("Parallel read took %s seconds " % (time.time() - start_time))
+
+sys.exit("error message")
+
+
+
+
+
+
+
 dataFrame = pd.read_pickle("PacketDataframe.pkl")
 folder_image = "Image"
 
 #Remove directory already created
-shutil.rmtree(folder_image) 
+#shutil.rmtree(folder_image) 
 
 try:
     os.mkdir(folder_image)
