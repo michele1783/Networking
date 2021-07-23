@@ -21,7 +21,6 @@ from matplotlib.pyplot import figure
 import seaborn as sns
 from collections import Counter
 import copy
-from collections import Counter
 import seaborn as sns
 import networkx as nx
 import imblearn
